@@ -3,14 +3,13 @@ package main
 // Hub maintains the set of active clients and broadcasts messages to the
 // clients.
 type Hub struct {
+	rooms map[int64]*Room
+
 	// Registered clients.
 	clients map[*Client]bool
 
 	// 서버 전체 브로드 캐스트
 	broadcastAll chan []byte
-
-	// 특정 방에만 브로드 캐스트
-	broadcastRoom chan []byte
 
 	// Register requests from the clients.
 	register chan *Client
@@ -21,11 +20,10 @@ type Hub struct {
 
 func newHub() *Hub {
 	return &Hub{
-		broadcastAll:  make(chan []byte),
-		broadcastRoom: make(chan []byte),
-		register:      make(chan *Client),
-		unregister:    make(chan *Client),
-		clients:       make(map[*Client]bool),
+		broadcastAll: make(chan []byte),
+		register:     make(chan *Client),
+		unregister:   make(chan *Client),
+		clients:      make(map[*Client]bool),
 	}
 }
 
