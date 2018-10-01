@@ -29,6 +29,9 @@ func main() {
 	flag.Parse()
 	hub := newHub()
 	go hub.run()
+	defer hub.logger.Sync() // flushes buffer, if any
+
+	hub.logger.Debug("server init")
 	http.HandleFunc("/", serveHome)
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		serveWs(hub, w, r) // 최초 클라이언트 요청

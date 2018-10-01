@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"log"
 	"net/http"
 	"time"
@@ -29,8 +30,8 @@ var (
 )
 
 var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
+	ReadBufferSize:  4096,
+	WriteBufferSize: 4096,
 }
 
 // Client is a middleman between the websocket connection and the hub.
@@ -42,6 +43,16 @@ type Client struct {
 
 	// Buffered channel of outbound messages.
 	send chan []byte
+
+	id int64
+}
+
+func ParseHandlerMessage(rawJson []byte, req interface{}) {
+	err := json.Unmarshal(rawJson, &req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// TODO logging
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -51,7 +62,8 @@ type Client struct {
 // reads from this goroutine.
 func (c *Client) readPump() {
 	defer func() {
-		c.hub.unregister <- c
+		//c.hub.unregister <- c
+		// TODO unregister 이벤트 발생
 		c.conn.Close()
 	}()
 	c.conn.SetReadLimit(maxMessageSize)
@@ -66,7 +78,27 @@ func (c *Client) readPump() {
 			break
 		}
 		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
-		c.hub.broadcastAll <- message
+		//c.hub.onPacket <- NewRequestMessage(c, message)
+		//
+
+		var rawJson map[string]*json.RawMessage
+		err = json.Unmarshal(message, &rawJson)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		var api string
+		err = json.Unmarshal(*rawJson["api"], &api)
+
+		switch api {
+		// TODO 별도 함수로..
+		case "RequestLogin":
+			var req MsgRequestLogin
+			ParseHandlerMessage(message, &req)
+			c.hub.logger.Debug("api : ", req.Api)
+			c.hub.eventQ <- NewEvent(c, "packet", req.Api, &req)
+			break
+		}
 	}
 }
 
@@ -114,6 +146,7 @@ func (c *Client) writePump() {
 				// 54초 마다 한번 보냄
 				return
 			}
+			c.hub.logger.Debug("ping message")
 		}
 	}
 }
@@ -126,7 +159,7 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	client := &Client{hub: hub, conn: conn, send: make(chan []byte, 256)} // 버퍼 사이즈 256..
-	client.hub.register <- client
+	//client.hub.register <- client
 
 	// Allow collection of memory referenced by the caller by doing all work in
 	// new goroutines.
