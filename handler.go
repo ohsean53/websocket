@@ -1,5 +1,7 @@
 package main
 
+import "websocket/lib"
+
 type MsgHandlerFunc func(*Event) error
 
 var msgHandler = map[string]MsgHandlerFunc{
@@ -13,6 +15,10 @@ func RequestLogin(event *Event) error {
 	var req *MsgRequestLogin
 	req = (event.data).(*MsgRequestLogin)
 	client.hub.logger.Debug("request login, id:", req.Uid)
+
+	var ret string
+	ret = "login complete id " + lib.Itoa64(req.Uid)
+	client.send <- []byte(ret)
 	return nil
 }
 
